@@ -19,10 +19,13 @@ export ORACLE_DOMAIN=$(hostname)
 
 MY_ORACLE_PASSWD=tiger
 MY_MEMORY_TARGET=800M
-MY_REDO_SIZE=100M
 MY_CHARSET=AL32UTF8
 MY_NCHARSET=AL16UTF16
-
+MY_REDO_SIZE=50M
+MY_SYSTEM_SIZE=50M
+MY_SYSAUX_SIZE=50M
+MY_TEMP_SIZE=50M
+MY_UNDO_SIZE=50M
 
 usage()
 {
@@ -117,41 +120,34 @@ db_domain='${ORACLE_HOSTNAME}'
 memory_max_target="${MY_MEMORY_TARGET}"
 memory_target="${MY_MEMORY_TARGET}"
 remote_login_passwordfile=EXCLUSIVE
-enable_pluggable_database=TRUE" > ${ORACLE_BASE}/admin/${ORACLE_SID}/pfile/init${ORACLE_SID}.ora
+enable_pluggable_database=FALSE" > ${ORACLE_BASE}/admin/${ORACLE_SID}/pfile/init${ORACLE_SID}.ora
 
 echo "CREATE SPFILE FROM PFILE='"${ORACLE_BASE}"/admin/"${ORACLE_SID}"/pfile/init"${ORACLE_SID}".ora';
 STARTUP NOMOUNT;
 EXIT;" > ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/01_spfile.sql
 
-echo "CREATE DATABASE "${ORACLE_SID}"
-	LOGFILE GROUP 1 ('/u03/app/oracle/oradata/"${ORACLE_SID}"/redo01a.rdo',
-			'/u04/app/oracle/oradata/"${ORACLE_SID}"/redo01b.rdo') SIZE "${MY_REDO_SIZE}",
-	GROUP 2 ('/u03/app/oracle/oradata/"${ORACLE_SID}"/redo02a.rdo',
-		'/u04/app/oracle/oradata/"${ORACLE_SID}"/redo02b.rdo') SIZE "${MY_REDO_SIZE}",
-	GROUP 3 ('/u03/app/oracle/oradata/"${ORACLE_SID}"/redo03a.rdo',
-		'/u04/app/oracle/oradata/"${ORACLE_SID}"/redo03b.rdo') SIZE "${MY_REDO_SIZE}"
-        CHARACTER SET "${MY_CHARSET}"
-        NATIONAL CHARACTER SET "${MY_NCHARSET}"
+cat <<EOF > ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/02_create_database.sql
+CREATE DATABASE ${ORACLE_SID}
+	LOGFILE GROUP 1 ('/u03/app/oracle/oradata/${ORACLE_SID}/redo01a.rdo',
+			'/u04/app/oracle/oradata/${ORACLE_SID}/redo01b.rdo') SIZE ${MY_REDO_SIZE},
+	GROUP 2 ('/u03/app/oracle/oradata/${ORACLE_SID}/redo02a.rdo',
+		'/u04/app/oracle/oradata/${ORACLE_SID}/redo02b.rdo') SIZE ${MY_REDO_SIZE},
+	GROUP 3 ('/u03/app/oracle/oradata/${ORACLE_SID}/redo03a.rdo',
+		'/u04/app/oracle/oradata/${ORACLE_SID}/redo03b.rdo') SIZE ${MY_REDO_SIZE}
+        CHARACTER SET ${MY_CHARSET}
+        NATIONAL CHARACTER SET ${MY_NCHARSET}
         EXTENT MANAGEMENT LOCAL
-        DATAFILE '/u02/app/oracle/oradata/"${ORACLE_SID}"/system01.dbf'
-	SIZE 1G AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
-        SYSAUX DATAFILE '/u02/app/oracle/oradata/"${ORACLE_SID}"/sysaux01.dbf'
-	SIZE 1G AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
-        DEFAULT TEMPORARY TABLESPACE temp TEMPFILE '/u02/app/oracle/oradata/"${ORACLE_SID}"/temp01.dbf'
-	SIZE 100M AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
-        UNDO TABLESPACE undo DATAFILE '/u02/app/oracle/oradata/"${ORACLE_SID}"/undo01.dbf'
-	SIZE 100M AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
-        ENABLE PLUGGABLE DATABASE
-        SEED
-        FILE_NAME_CONVERT = ('/u02/app/oracle/oradata/"${ORACLE_SID}"/', '/u02/app/oracle/oradata/"${ORACLE_SID}"/pdbseed/')
-        SYSTEM DATAFILES SIZE 100M AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
-        SYSAUX DATAFILES SIZE 100M
-        USER_DATA TABLESPACE users DATAFILE '/u02/app/oracle/oradata/"${ORACLE_SID}"/pdbseed/users01.dbf'
-	SIZE 100M REUSE AUTOEXTEND ON MAXSIZE UNLIMITED;
-
-CREATE TABLESPACE users DATAFILE '/u02/app/oracle/oradata/"${ORACLE_SID}"/users01.dbf'
-SIZE 100M AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED;
-EXIT;" > ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/02_create_database.sql
+        DATAFILE '/u02/app/oracle/oradata/${ORACLE_SID}/system01.dbf'
+	SIZE ${MY_SYSTEM_SIZE} AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
+        SYSAUX DATAFILE '/u02/app/oracle/oradata/${ORACLE_SID}/sysaux01.dbf'
+	SIZE ${MY_SYSAUX_SIZE} AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
+        DEFAULT TEMPORARY TABLESPACE temp TEMPFILE '/u02/app/oracle/oradata/${ORACLE_SID}/temp01.dbf'
+	SIZE ${MY_TEMP_SIZE}  AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
+        UNDO TABLESPACE undo DATAFILE '/u02/app/oracle/oradata/${ORACLE_SID}/undo01.dbf'
+	SIZE ${MY_UNDO_SIZE} AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
+	;
+EXIT;
+EOF
 
 echo "ALTER USER SYS IDENTIFIED BY "${MY_ORACLE_PASSWD}";
 ALTER USER SYSTEM IDENTIFIED BY "${MY_ORACLE_PASSWD}";
