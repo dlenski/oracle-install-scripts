@@ -136,22 +136,27 @@ CREATE DATABASE ${ORACLE_SID}
 		'/u04/app/oracle/oradata/${ORACLE_SID}/redo03b.rdo') SIZE ${MY_REDO_SIZE}
         CHARACTER SET ${MY_CHARSET}
         NATIONAL CHARACTER SET ${MY_NCHARSET}
-        EXTENT MANAGEMENT LOCAL
         DATAFILE '/u02/app/oracle/oradata/${ORACLE_SID}/system01.dbf'
 	SIZE ${MY_SYSTEM_SIZE} AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
+        EXTENT MANAGEMENT LOCAL
         SYSAUX DATAFILE '/u02/app/oracle/oradata/${ORACLE_SID}/sysaux01.dbf'
-	SIZE ${MY_SYSAUX_SIZE} AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
-        DEFAULT TEMPORARY TABLESPACE temp TEMPFILE '/u02/app/oracle/oradata/${ORACLE_SID}/temp01.dbf'
-	SIZE ${MY_TEMP_SIZE}  AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
+	  SIZE ${MY_SYSAUX_SIZE} AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
         UNDO TABLESPACE undo DATAFILE '/u02/app/oracle/oradata/${ORACLE_SID}/undo01.dbf'
-	SIZE ${MY_UNDO_SIZE} AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
+	  SIZE ${MY_UNDO_SIZE} AUTOEXTEND ON NEXT 50M MAXSIZE UNLIMITED
+        DEFAULT TEMPORARY TABLESPACE temp TEMPFILE '/u02/app/oracle/oradata/${ORACLE_SID}/temp01.dbf'
+	  SIZE ${MY_TEMP_SIZE}
 	;
+STARTUP;
 EXIT;
 EOF
 
 echo "ALTER USER SYS IDENTIFIED BY "${MY_ORACLE_PASSWD}";
 ALTER USER SYSTEM IDENTIFIED BY "${MY_ORACLE_PASSWD}";
 EXIT;" > ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/03_sys_users.sql
+
+echo "@?/rdbms/admin/catalog.sql
+@?/rdbms/admin/catproc.sql
+EXIT;" > ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/04_catalog.sql
 
 echo "SHUTDOWN IMMEDIATE;
 STARTUP;
@@ -165,35 +170,29 @@ echo "NOTE: This might take some time."
 
 for sql in ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/01_spfile.sql \
            ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/02_create_database.sql \
-           ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/03_sys_users.sql
+           ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/03_sys_users.sql \
+           ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/04_catalog.sql
+           
 do
 	echo "$sql"
-	$ORACLE_HOME/bin/sqlplus / as sysdba @$sql
+	$ORACLE_HOME/bin/sqlplus "sys/${MY_ORACLE_PASSWD}" as sysdba @$sql
 done
-
-echo "Executed SQL*Plus scripts, now creating the data dictionary."
-echo "NOTE: This may take some time."
-
-PERL5LIB=$ORACLE_HOME/rdbms/admin:$PERL5LIB; export PERL5LIB
-perl $ORACLE_HOME/rdbms/admin/catcon.pl -n 1 -l ${ORACLE_BASE}/admin/${ORACLE_SID}/logbook -b catalog $ORACLE_HOME/rdbms/admin/catalog.sql;
-perl $ORACLE_HOME/rdbms/admin/catcon.pl -n 1 -l ${ORACLE_BASE}/admin/${ORACLE_SID}/logbook -b catproc $ORACLE_HOME/rdbms/admin/catproc.sql;
-perl $ORACLE_HOME/rdbms/admin/catcon.pl -n 1 -l ${ORACLE_BASE}/admin/${ORACLE_SID}/logbook -b pupbld -u SYSTEM/${MY_ORACLE_PASSWD} $ORACLE_HOME/sqlplus/admin/pupbld.sql;
 
 echo "Finished creating the data dictionary, now recompiling invalid objects..."
 echo "@?/rdbms/admin/utlrp
 exit;" > ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/99_utlrp.sql
 
-$ORACLE_HOME/bin/sqlplus / as sysdba @${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/99_utlrp.sql
+$ORACLE_HOME/bin/sqlplus "sys/${MY_ORACLE_PASSWD}" as sysdba @${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/99_utlrp.sql
 
 
 
 echo "Alright, finished everything so far."
 echo "Now restarting the database."
-$ORACLE_HOME/bin/sqlplus / as sysdba @${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/99_restart_db.sql
+$ORACLE_HOME/bin/sqlplus "sys/${MY_ORACLE_PASSWD}" as sysdba @${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/99_restart_db.sql
 
 echo "ALTER SYSTEM REGISTER;
 EXIT;" > ${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/98_system_register.sql
-$ORACLE_HOME/bin/sqlplus / as sysdba @${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/98_system_register.sql
+$ORACLE_HOME/bin/sqlplus "sys/${MY_ORACLE_PASSWD}" as sysdba @${ORACLE_BASE}/admin/${ORACLE_SID}/scripts/98_system_register.sql
 
 # SRVCTL and ORATAB
 echo "Now calling SRVCTL..."
